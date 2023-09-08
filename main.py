@@ -19,8 +19,8 @@ dotenv.load_dotenv()
 ######### ENVIRONMENT VARIABLES ##########
 verbose = True
 
-litellm.token = "" # get your own - https://admin.litellm.ai/
-
+# litellm.token = "" # get your own - https://admin.litellm.ai/
+# litellm.use_client = True
 # litellm.caching_with_models = True # CACHING: caching_with_models Keys in the cache are messages + model. - to learn more: https://docs.litellm.ai/docs/caching/
 
 ############ HELPER FUNCTIONS ###################################
