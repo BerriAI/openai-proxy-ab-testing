@@ -1,4 +1,4 @@
-# CodeLlama Server: Streaming, Caching, Model Fallbacks (OpenAI + Anthropic), Prompt-tracking
+# AB Testing Server: Streaming, Caching, Model Fallbacks (OpenAI + Anthropic), Prompt-tracking
 
 Works with: Anthropic, Huggingface, Cohere, TogetherAI, Azure, OpenAI, etc.
 
