@@ -7,22 +7,22 @@ from util import handle_error
 from litellm import completion 
 import os, dotenv, time 
 import json
+import concurrent.futures
+import threading
 dotenv.load_dotenv()
 
 # TODO: set your keys in .env or here:
 # os.environ["OPENAI_API_KEY"] = "" # set your openai key here
 # os.environ["ANTHROPIC_API_KEY"] = "" # set your anthropic key here
 # os.environ["TOGETHER_AI_API_KEY"] = "" # set your together ai key here
-# see supported models / keys here: https://litellm.readthedocs.io/en/latest/supported/
+# see supported models / keys here: https://docs.litellm.ai/docs/providers
 ######### ENVIRONMENT VARIABLES ##########
 verbose = True
 
-# litellm.caching_with_models = True # CACHING: caching_with_models Keys in the cache are messages + model. - to learn more: https://docs.litellm.ai/docs/caching/
-######### PROMPT LOGGING ##########
-os.environ["PROMPTLAYER_API_KEY"] = "" # set your promptlayer key here - https://promptlayer.com/
+litellm.token = "" # get your own - https://admin.litellm.ai/
 
-# set callbacks
-litellm.success_callback = ["promptlayer"]
+# litellm.caching_with_models = True # CACHING: caching_with_models Keys in the cache are messages + model. - to learn more: https://docs.litellm.ai/docs/caching/
+
 ############ HELPER FUNCTIONS ###################################
 
 def print_verbose(print_statement):
@@ -40,24 +40,43 @@ def data_generator(response):
     for chunk in response:
         yield f"data: {json.dumps(chunk)}\n\n"
 
+def simple_llm_call(model, messages):
+    completion(model=model, messages=messages)
+    return 
+
+def batch_model_calls(model_list, messages): 
+    results = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_result = {executor.submit(simple_llm_call, model, messages): model for model in model_list}
+        for future in concurrent.futures.as_completed(future_to_result):
+            try:
+                results.append(future.result())
+            except Exception as exc:
+                print(f'Generated an exception: {exc}')
+    return results
+
 @app.route('/chat/completions', methods=["POST"])
 def api_completion():
     data = request.json
-    start_time = time.time() 
     if data.get('stream') == "True":
         data['stream'] = True # convert to boolean
     try:
+        # GET MODELS
+        selected_model = "gpt-3.5-turbo" # by default always return the response from gpt-3.5-turbo
+
+        # PROMPT LOGIC
         if "prompt" not in data:
-            raise ValueError("data needs to have prompt")
-        data["model"] = "togethercomputer/CodeLlama-34b-Instruct" # by default use Together AI's CodeLlama model - https://api.together.xyz/playground/chat?model=togethercomputer%2FCodeLlama-34b-Instruct
-        # COMPLETION CALL
+            data["prompt"] = "What's the weather like in San Francisco?"
         system_prompt = "Only respond to questions about code. Say 'I don't know' to anything outside of that."
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": data.pop("prompt")}]
-        data["messages"] = messages
-        print(f"data: {data}")
-        response = completion(**data)
-        ## LOG SUCCESS
-        end_time = time.time() 
+
+        # COMPLETION CALL
+        response = completion(model=selected_model, messages=messages)
+
+        # CALL REST OF MODELS - to log what their results would have been 
+        model_list = [{"model": "facebook/opt-125m", "provider": "openai", "api_base": "http://localhost:8000/v1"}]
+        threading.Thread(target=batch_model_calls, args=(model_list, messages)).start()
+
         if 'stream' in data and data['stream'] == True: # use generate_responses to stream responses
             return Response(data_generator(response), mimetype='text/event-stream')
     except Exception as e:
